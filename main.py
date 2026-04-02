@@ -28,16 +28,10 @@ api_key = os.getenv("GEMINI_API_KEY")
 print("⚡ Menyalakan Server AI SAKTI...")
 embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=api_key)
 
-# --- BAGIAN INI YANG DIPERBAIKI URUTANNYA ---
-# Definisikan path DULU sebelum load FAISS
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "sakti_db_vektor") 
-
-# Gunakan variabel DB_PATH di sini, jangan pakai string "sakti_db_vektor" lagi
-db_vektor = FAISS.load_local(DB_PATH, embeddings, allow_dangerous_deserialization=True)
+# Cukup gunakan nama foldernya langsung untuk Railway
+db_vektor = FAISS.load_local("sakti_db_vektor", embeddings, allow_dangerous_deserialization=True)
 pencari_konteks = db_vektor.as_retriever(search_kwargs={"k": 3})
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
-# -------------------------------------------
 
 template_sakti = """Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip yang ramah dan solutif.
 Jawab pertanyaan HANYA berdasarkan konteks dokumen di bawah ini.
@@ -48,12 +42,10 @@ Jawaban SAKTI:"""
 prompt = PromptTemplate.from_template(template_sakti)
 rag_chain = ({"context": pencari_konteks, "question": RunnablePassthrough()} | prompt | llm | StrOutputParser())
 
-
-# 3. FORMAT DATA DARI FRONTEND (Cukup 1 class saja)
+# 3. FORMAT DATA DARI FRONTEND
 class PesanMahasiswa(BaseModel):
     pesan: str
     gambar_base64: Optional[str] = None # (Optional artinya boleh kosong kalau mhs cuma ngetik teks)
-
 
 # 4. JEMBATAN API (ENDPOINT) UNTUK FRONTEND
 @app.post("/api/chat")
@@ -71,4 +63,4 @@ async def chat_sakti(request: PesanMahasiswa):
 
 @app.get("/")
 async def root():
-    return {"message": "Server SAKTI AI Berjalan Lancar! 🚀"}
+    return {"message": "Server SAKTI AI Berjalan Lancar di Railway! 🚀"}
