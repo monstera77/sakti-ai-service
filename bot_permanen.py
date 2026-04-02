@@ -67,7 +67,7 @@ rag_chain = (
 # 4. TES UJI COBA DATA BARU!
 # ==========================================
 # Ganti pertanyaan ini dengan salah satu kasus ekstrem yang baru saja kamu tambahkan di Word!
-pertanyaan_mhs = "apa itu kipk?"
+pertanyaan_mhs = "dari gambar yang saya lampirkan apakah saya suda tidak bisa mengisi monev "
 
 print("\n" + "="*50)
 print(f"🙋‍♂️ Mahasiswa : {pertanyaan_mhs}")
