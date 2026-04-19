@@ -7,69 +7,81 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 from langchain_community.vectorstores import FAISS
 from langchain_core.messages import HumanMessage
 
-# 1. SETUP AWAL
+
 load_dotenv(override=True)
-api_key = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Fungsi untuk mengubah gambar menjadi format Base64 (agar bisa dikirim ke otak Gemini)
-def baca_gambar_base64(path_gambar):
-    with open(path_gambar, "rb") as file_gambar:
-        return base64.b64encode(file_gambar.read()).decode('utf-8')
+KNOWLEDGE_DOC = "data_pengetahuan/pedoman.docx"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
+CHAT_MODEL = "gemini-2.5-flash"
 
-# 2. PERSIAPAN DATA TEKS & FAISS (Memori SAKTI)
-print("1. Membangun ulang memori teks SAKTI...")
-loader = Docx2txtLoader("data_pengetahuan/pedoman.docx")
-potongan = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50).split_documents(loader.load())
 
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=api_key)
-db_vektor = FAISS.from_documents(potongan, embeddings)
+def encode_image(image_path: str) -> str:
+    with open(image_path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
 
-# 3. PERSIAPAN MULTIMODAL (Mata & Mulut SAKTI)
-# Kita pakai Gemini 2.5 Flash yang punya fitur bawaan membaca gambar
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
 
-# ==========================================
-# 4. SIMULASI KASUS MAHASISWA (TEKS + GAMBAR)
-# ==========================================
-pertanyaan_mhs = "izin bertanya kak ini saya sudah melakukan pengisian dan submit berkas namun mepet dengan jadwal yang ditentukan apakah aman atau bagaimana ya kak karena yang tertera di situ sudah tutup kak?"
-path_gambar_mhs = "data_pengetahuan/telat.png" # <-- PASTIKAN NAMA FILE DAN LOKASINYA BENAR!
+def build_vector_store(doc_path: str) -> FAISS:
+    loader = Docx2txtLoader(doc_path)
+    documents = loader.load()
 
-print(f"\n🙋‍♂️ Mahasiswa : {pertanyaan_mhs}")
-print(f"📸 Melampirkan Gambar : {path_gambar_mhs}")
-print("🤖 SAKTI sedang melihat gambar dan mencari buku panduan...")
-print("="*60)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    chunks = splitter.split_documents(documents)
 
-# 5. PENCARIAN BUKU PANDUAN (RAG)
-# SAKTI mencari dokumen yang relevan dengan keluhan teks mahasiswa
-hasil_pencarian = db_vektor.similarity_search(pertanyaan_mhs, k=2)
-konteks_dokumen = "\n".join([doc.page_content for doc in hasil_pencarian])
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model=EMBEDDING_MODEL,
+        google_api_key=GEMINI_API_KEY,
+    )
+    return FAISS.from_documents(chunks, embeddings)
 
-# 6. MERAKIT PESAN MULTIMODAL
-# Kita ubah gambar jadi sandi base64
-gambar_base64 = baca_gambar_base64(path_gambar_mhs)
 
-# Format pesan khusus yang menggabungkan Prompt, Teks FAISS, dan Gambar
-pesan_sakti = HumanMessage(
-    content=[
-        {
-            "type": "text", 
-            "text": f"""Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip.
-            Tugasmu adalah menganalisis gambar screenshot keluhan mahasiswa dan menjawab pertanyaannya HANYA berdasarkan dokumen panduan berikut.
-            
-            Dokumen Panduan (Konteks RAG):
-            {konteks_dokumen}
-            
-            Pertanyaan Mahasiswa: {pertanyaan_mhs}
-            
-            Instruksi: Jawablah dengan ramah dan solutif ala kakak tingkat. Beritahu mahasiswa apa yang kamu lihat di screenshot tersebut, lalu berikan solusi konkret berdasarkan Dokumen Panduan."""
-        },
-        {
-            "type": "image_url", 
-            "image_url": {"url": f"data:image/png;base64,{gambar_base64}"}
-        }
-    ]
-)
+def retrieve_context(vector_store: FAISS, query: str, k: int = 2) -> str:
+    results = vector_store.similarity_search(query, k=k)
+    return "\n".join(doc.page_content for doc in results)
 
-# 7. EKSEKUSI!
-jawaban_final = llm.invoke([pesan_sakti])
-print(f"\n✨ SAKTI :\n{jawaban_final.content}\n")
+
+def build_message(query: str, context: str, image_path: str) -> HumanMessage:
+    image_b64 = encode_image(image_path)
+
+    system_prompt = f"""Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip.
+Tugasmu adalah menganalisis screenshot yang dilampirkan mahasiswa dan menjawab pertanyaannya berdasarkan dokumen panduan berikut.
+
+Dokumen Panduan:
+{context}
+
+Pertanyaan Mahasiswa: {query}
+
+Instruksi: Jawablah dengan ramah dan solutif. Jelaskan apa yang terlihat di screenshot, lalu berikan solusi konkret sesuai panduan."""
+
+    return HumanMessage(
+        content=[
+            {"type": "text", "text": system_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_b64}"}},
+        ]
+    )
+
+
+def answer(query: str, image_path: str) -> str:
+    vector_store = build_vector_store(KNOWLEDGE_DOC)
+    context = retrieve_context(vector_store, query)
+
+    llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=GEMINI_API_KEY)
+    message = build_message(query, context, image_path)
+
+    response = llm.invoke([message])
+    return response.content
+
+
+if __name__ == "__main__":
+    query = (
+        "izin bertanya kak ini saya sudah melakukan pengisian dan submit berkas "
+        "namun mepet dengan jadwal yang ditentukan apakah aman atau bagaimana ya kak "
+        "karena yang tertera di situ sudah tutup kak?"
+    )
+    image_path = "data_pengetahuan/telat.png"
+
+    print(f"Mahasiswa : {query}")
+    print(f"Lampiran  : {image_path}\n")
+
+    result = answer(query, image_path)
+    print(f"SAKTI :\n{result}")

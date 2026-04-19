@@ -7,63 +7,64 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import HumanMessage
 
-# 1. SETUP AWAL
+
 load_dotenv(override=True)
-api_key = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 2. DATA INGESTION (Membaca & Memotong Dokumen)
-print("1. Menyiapkan memori SAKTI...")
-loader = Docx2txtLoader("data_pengetahuan/pedoman.docx")
-potongan_dokumen = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50).split_documents(loader.load())
+KNOWLEDGE_DOC = "data_pengetahuan/pedoman.docx"
+EMBEDDING_MODEL = "models/gemini-embedding-001"
+CHAT_MODEL = "gemini-2.5-flash"
 
-# 3. DATABASE VEKTOR (Otak Pencarian)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001", google_api_key=api_key)
-db_vektor = FAISS.from_documents(potongan_dokumen, embeddings)
-
-# Jadikan FAISS sebagai "Retriever" (Tukang Cari Buku), ambil 2 potongan paling relevan
-pencari_konteks = db_vektor.as_retriever(search_kwargs={"k": 2})
-
-# 4. LLM (Mulut Bot)
-llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key)
-
-# 5. PROMPT (Instruksi Kepribadian Bot)
-template_sakti = """
-Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip yang ramah, asyik, dan solutif.
+PROMPT_TEMPLATE = """
+Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip yang ramah dan solutif.
 Tugasmu adalah menjawab pertanyaan mahasiswa penerima KIP-Kuliah Undip.
 
-Gunakan HANYA informasi dari konteks di bawah ini untuk menjawab pertanyaan. 
-Jika di dalam konteks tidak ada jawabannya, bilang saja dengan jujur "Maaf, SAKTI belum punya informasi soal itu, coba tanyakan ke pengurus Kamadiksi ya!". 
-JANGAN PERNAH mengarang jawaban sendiri di luar konteks.
+Gunakan HANYA informasi dari konteks berikut untuk menjawab. Jika jawaban tidak \
+tersedia dalam konteks, sampaikan dengan jujur: "Maaf, SAKTI belum punya informasi \
+soal itu, coba tanyakan ke pengurus Kamadiksi ya!" Jangan mengarang jawaban di luar konteks.
 
-Konteks Dokumen:
+Konteks:
 {context}
 
-Pertanyaan Mahasiswa: {question}
+Pertanyaan: {question}
 
-Jawaban SAKTI:"""
-prompt = PromptTemplate.from_template(template_sakti)
+Jawaban:"""
 
-# 6. MERAKIT RAG CHAIN (Menyatukan Semuanya)
-rag_chain = (
-    {"context": pencari_konteks, "question": RunnablePassthrough()}
-    | prompt
-    | llm
-    | StrOutputParser()
-)
 
-# ==========================================
-# 7. MARI KITA TES NGOBROL DENGAN SAKTI!
-# ==========================================
-pertanyaan_mhs = "Kak, UKT aku masih ada tagihannya padahal aku KIPK tambahan, aku panik nih harus bayar atau ngga buat her-reg?"
+def build_rag_chain():
+    loader = Docx2txtLoader(KNOWLEDGE_DOC)
+    chunks = RecursiveCharacterTextSplitter(
+        chunk_size=500, chunk_overlap=50
+    ).split_documents(loader.load())
 
-print("\n" + "="*50)
-print(f"🙋‍♂️ Mahasiswa : {pertanyaan_mhs}")
-print("🤖 SAKTI sedang berpikir dan mengetik...")
-print("="*50 + "\n")
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model=EMBEDDING_MODEL,
+        google_api_key=GEMINI_API_KEY,
+    )
+    retriever = FAISS.from_documents(chunks, embeddings).as_retriever(
+        search_kwargs={"k": 2}
+    )
 
-# Menjalankan rantai RAG
-jawaban_final = rag_chain.invoke(pertanyaan_mhs)
+    llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=GEMINI_API_KEY)
+    prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
 
-print(f"✨ SAKTI :\n{jawaban_final}\n")
+    return (
+        {"context": retriever, "question": RunnablePassthrough()}
+        | prompt
+        | llm
+        | StrOutputParser()
+    )
+
+
+def answer(query: str) -> str:
+    chain = build_rag_chain()
+    return chain.invoke(query)
+
+
+if __name__ == "__main__":
+    query = "Kak, UKT aku masih ada tagihannya padahal aku KIPK tambahan, aku panik nih harus bayar atau ngga buat her-reg?"
+
+    print(f"Mahasiswa : {query}\n")
+    result = answer(query)
+    print(f"SAKTI :\n{result}")
