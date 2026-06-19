@@ -144,3 +144,8 @@ async def chat(request: ChatRequest):
 
     # 3. Kembalikan balasan ke Frontend
     return {"status": "sukses", "jawaban": answer}
+
+if __name__ == "__main__":
+    import uvicorn
+    # Pelabuhan (port) 7860 adalah harga mati dari aturan keamanan Hugging Face
+    uvicorn.run(app, host="0.0.0.0", port=7860)

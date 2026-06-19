@@ -1,20 +1,19 @@
 import os
 from dotenv import load_dotenv
-from langchain_community.document_loaders import Docx2txtLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+# --- Hapus import Docx2txtLoader dan TextSplitter karena kita tidak membaca dokumen dari nol lagi ---
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser
 
-
 load_dotenv(override=True)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-KNOWLEDGE_DOC = "data_pengetahuan/pedoman.docx"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
-CHAT_MODEL = "gemini-2.5-flash"
+CHAT_MODEL = "gemini-3.5-flash"
+# --- Tambahkan path ke database vektor lokal ---
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sakti_db_vektor")
 
 PROMPT_TEMPLATE = """
 Kamu adalah SAKTI, Asisten Virtual Kamadiksi Undip yang ramah dan solutif.
@@ -33,22 +32,23 @@ Jawaban:"""
 
 
 def build_rag_chain():
-    loader = Docx2txtLoader(KNOWLEDGE_DOC)
-    chunks = RecursiveCharacterTextSplitter(
-        chunk_size=500, chunk_overlap=50
-    ).split_documents(loader.load())
-
+    # 1. Siapkan mesin pencari vektor (Embeddings)
     embeddings = GoogleGenerativeAIEmbeddings(
         model=EMBEDDING_MODEL,
         google_api_key=GEMINI_API_KEY,
     )
-    retriever = FAISS.from_documents(chunks, embeddings).as_retriever(
+    
+    # 2. LOAD DATABASE LOKAL (Tidak lagi membaca file DOCX dari awal)
+    vector_store = FAISS.load_local(DB_PATH, embeddings, allow_dangerous_deserialization=True)
+    retriever = vector_store.as_retriever(
         search_kwargs={"k": 2}
     )
 
+    # 3. Siapkan LLM dan Prompt
     llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=GEMINI_API_KEY)
     prompt = PromptTemplate.from_template(PROMPT_TEMPLATE)
 
+    # 4. Rangkai menjadi satu alur (Chain)
     return (
         {"context": retriever, "question": RunnablePassthrough()}
         | prompt
@@ -63,7 +63,7 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = "Kak, UKT aku masih ada tagihannya padahal aku KIPK tambahan, aku panik nih harus bayar atau ngga buat her-reg?"
+    query = "Kak, untuk pengisian monev apakah wajib bagi penerima kipk di undip"
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)
