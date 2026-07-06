@@ -11,7 +11,7 @@ load_dotenv(override=True)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 EMBEDDING_MODEL = "models/gemini-embedding-001"
-CHAT_MODEL = "gemini-3.5-flash"
+CHAT_MODEL = "gemini-2.5-flash"
 # --- Tambahkan path ke database vektor lokal ---
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sakti_db_vektor")
 
@@ -63,7 +63,7 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = "Kak, untuk pengisian monev apakah wajib bagi penerima kipk di undip"
+    query = "Apakah tetap harus mengisi formulir UKT jika mendaftar KIPK?"
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)
