@@ -63,7 +63,7 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = "Apakah tetap harus mengisi formulir UKT jika mendaftar KIPK?"
+    query = "Izin bertanya kak, untuk monev saya mengirimkannya yang KK 2018, dan saya sudah mengirimkan. Yang 2023 sudah ada dan ada pembaruan kalo kakak saya sudah menikah, jadi yang tertera seharusnya bapak, ibu, dan saya saja. Solusinya bagaimana ya? terima kasih "
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)
