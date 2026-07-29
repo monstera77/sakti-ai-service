@@ -69,6 +69,9 @@ class ChatRequest(BaseModel):
     gambar_base64: Optional[str] = None
     history: List[Dict[str, str]] = []
 
+class TitleRequest(BaseModel):
+    pesan: str
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -122,6 +125,21 @@ def build_messages(query: str, context: str, image_data: Optional[str], history:
     messages.append(HumanMessage(content=user_content))
     return messages
 
+    # Fungsi pembantu baru untuk merangkum judul
+def generate_short_title(query: str) -> str:
+    prompt = (
+        f"Buat judul singkat dan profesional (maksimal 4 kata) "
+        f"yang merangkum inti dari pesan ini: '{query}'. "
+        f"Jangan gunakan tanda kutip, langsung tuliskan judulnya."
+    )
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        # Membersihkan tanda kutip yang mungkin terbawa oleh LLM
+        return response.content.strip().replace('"', '').replace("'", "")
+    except Exception as e:
+        print(f"⚠️ Error saat membuat judul: {e}")
+        return "Percakapan Baru"
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -150,6 +168,13 @@ async def chat(request: ChatRequest):
             answer = "Mohon maaf, sistem Sakabot sedang mengalami sedikit gangguan. Silakan coba lagi beberapa saat."
 
     return {"status": "sukses", "jawaban": answer}
+
+
+# Endpoint baru khusus pembuatan judul percakapan
+@app.post("/api/generate-title")
+async def get_title(request: TitleRequest):
+    judul = generate_short_title(request.pesan)
+    return {"status": "sukses", "judul": judul}
 
 if __name__ == "__main__":
     import uvicorn
