@@ -63,7 +63,8 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = "Izin bertanya kak, untuk monev saya mengirimkannya yang KK 2018, dan saya sudah mengirimkan. Yang 2023 sudah ada dan ada pembaruan kalo kakak saya sudah menikah, jadi yang tertera seharusnya bapak, ibu, dan saya saja. Solusinya bagaimana ya? terima kasih "
+    query = """mauu nanya, kak. ini kan di drive udah ada surat pernyataan penghasilan ortuu, nah itu berarti gaperlu pake slip gaji atau tetep pake. dan biasanya klo ada ortu yg ga bekerja kan bkin surat pernyataan jg, ini brti gausa ya? 
+makasii"""
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)

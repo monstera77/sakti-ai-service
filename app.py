@@ -1,6 +1,6 @@
 import os
 import ast
-from typing import Optional
+from typing import Optional, List, Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 
 # ---------------------------------------------------------------------------
@@ -67,6 +67,7 @@ llm = ChatGoogleGenerativeAI(model=CHAT_MODEL, google_api_key=GEMINI_API_KEY)
 class ChatRequest(BaseModel):
     pesan: str
     gambar_base64: Optional[str] = None
+    history: List[Dict[str, str]] = []
 
 
 # ---------------------------------------------------------------------------
@@ -77,18 +78,14 @@ def retrieve_context(query: str) -> str:
     docs = retriever.invoke(query)
     return "\n\n".join(doc.page_content for doc in docs)
 
-
 def normalize_image_data(raw: str) -> str:
     if not raw.startswith("data:image"):
         return f"data:image/jpeg;base64,{raw}"
     return raw
 
-
 def extract_text(response_content) -> str:
-    """Guard against Gemini occasionally returning a JSON-like string."""
     if not isinstance(response_content, str):
         return response_content
-
     if response_content.strip().startswith("[{"):
         try:
             parsed = ast.literal_eval(response_content)
@@ -96,22 +93,34 @@ def extract_text(response_content) -> str:
                 return parsed[0].get("text", response_content)
         except Exception:
             pass
-
     return response_content
 
-
-def build_messages(query: str, context: str, image_data: Optional[str]) -> list:
+def build_messages(query: str, context: str, image_data: Optional[str], history: list) -> list:
+    # 1. Masukkan Instruksi Utama + Konteks Dokumen
     system = SystemMessage(content=SYSTEM_PROMPT.format(context=context))
+    messages = [system]
 
+    # 2. Sisipkan Riwayat Obrolan (Ingatan SAKABOT)
+    for msg in history:
+        # Mengambil data dari dictionary standar Python
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        
+        if role in ["user", "human"]:
+            messages.append(HumanMessage(content=content))
+        elif role in ["model", "assistant", "ai"]:
+            messages.append(AIMessage(content=content))
+
+    # 3. Masukkan Pertanyaan Baru (+ Gambar jika ada)
     user_content = [{"type": "text", "text": query}]
     if image_data:
         user_content.append({
             "type": "image_url",
             "image_url": {"url": normalize_image_data(image_data)},
         })
-
-    return [system, HumanMessage(content=user_content)]
-
+    
+    messages.append(HumanMessage(content=user_content))
+    return messages
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -121,20 +130,18 @@ def build_messages(query: str, context: str, image_data: Optional[str]) -> list:
 async def root():
     return {"message": "SAKTI AI Microservice is running."}
 
-
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
-    # 1. Tarik referensi & susun pesan
+    # 1. Tarik referensi & susun pesan (sekarang menyertakan history)
     context = retrieve_context(request.pesan)
-    messages = build_messages(request.pesan, context, request.gambar_base64)
+    messages = build_messages(request.pesan, context, request.gambar_base64, request.history)
 
-    # 2. Kirim ke LLM dengan Error Handling (Rate Limit dll)
+    # 2. Kirim ke LLM dengan Error Handling
     try:
         response = llm.invoke(messages)
         answer = extract_text(response.content)
     except Exception as e:
         error_msg = str(e).lower()
-        # Jika error mengandung kata "429", "quota", atau "exhausted", berarti antrean penuh
         if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
             print("⚠️ Terkena Limit API Menitan (Rate Limit)!")
             answer = "Mohon maaf, saat ini antrean konsultasi Sakabot sedang penuh. Silakan tunggu sekitar 10-15 detik, lalu coba kirimkan pesanmu lagi ya!"
@@ -142,7 +149,6 @@ async def chat(request: ChatRequest):
             print(f"⚠️ Terjadi error sistem: {e}")
             answer = "Mohon maaf, sistem Sakabot sedang mengalami sedikit gangguan. Silakan coba lagi beberapa saat."
 
-    # 3. Kembalikan balasan ke Frontend
     return {"status": "sukses", "jawaban": answer}
 
 if __name__ == "__main__":
