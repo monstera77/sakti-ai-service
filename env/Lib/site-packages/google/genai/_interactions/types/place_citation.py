@@ -55,12 +55,15 @@ class PlaceCitation(BaseModel):
 
     review_snippets: Optional[List[ReviewSnippet]] = None
     """
-    Snippets of reviews that are used to generate answers about the
-    features of a given place in Google Maps.
+    Snippets of reviews that are used to generate answers about the features of a
+    given place in Google Maps.
     """
 
     start_index: Optional[int] = None
-    """Start of segment of the response that is attributed to this source."""
+    """Start of segment of the response that is attributed to this source.
+
+    Index indicates the start of the segment, measured in bytes.
+    """
 
     url: Optional[str] = None
     """URI reference of the place."""

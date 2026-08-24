@@ -55,12 +55,15 @@ class PlaceCitationParam(TypedDict, total=False):
 
     review_snippets: Iterable[ReviewSnippet]
     """
-    Snippets of reviews that are used to generate answers about the
-    features of a given place in Google Maps.
+    Snippets of reviews that are used to generate answers about the features of a
+    given place in Google Maps.
     """
 
     start_index: int
-    """Start of segment of the response that is attributed to this source."""
+    """Start of segment of the response that is attributed to this source.
+
+    Index indicates the start of the segment, measured in bytes.
+    """
 
     url: str
     """URI reference of the place."""

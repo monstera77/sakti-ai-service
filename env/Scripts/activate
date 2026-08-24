@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="D:\Kuliah King\SMT 6\PDC 1 Bismillah\sakti-ai-service\env"
+VIRTUAL_ENV="D:\Kuliah King\SMT 7\sakti-ai-service\env"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
