@@ -63,8 +63,7 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = """mauu nanya, kak. ini kan di drive udah ada surat pernyataan penghasilan ortuu, nah itu berarti gaperlu pake slip gaji atau tetep pake. dan biasanya klo ada ortu yg ga bekerja kan bkin surat pernyataan jg, ini brti gausa ya? 
-makasii"""
+    query = """ kapan pencairan KIP-Kuliah Undip semester ganjil?"""
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)
