@@ -63,7 +63,7 @@ def answer(query: str) -> str:
 
 
 if __name__ == "__main__":
-    query = """ kapan pencairan KIP-Kuliah Undip semester ganjil?"""
+    query = """ kapan pencairan KIP-Kuliah Undip?"""
 
     print(f"Mahasiswa : {query}\n")
     result = answer(query)
